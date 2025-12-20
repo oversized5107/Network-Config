@@ -1,0 +1,205 @@
+plugins:
+  ##################################################
+  # 运营商 DNS
+  - tag: near
+    type: forward
+    args:
+      concurrent: 2
+      upstreams:
+        - addr: "udp://运营商DNS"
+
+  # AliDNS
+  - tag: ali
+    type: forward
+    args:
+      concurrent: 2
+      upstreams:
+        - addr: "quic://223.5.5.5"
+        - addr: "h3://223.6.6.6/dns-query"
+          enable_http3: true
+        - addr: "tls://223.5.5.5"
+          enable_pipeline: true
+        - addr: "tls://223.6.6.6"
+          enable_pipeline: true
+        - addr: "https://223.6.6.6/dns-query"
+          enable_http3: true
+
+  # DNSPod
+  - tag: dnspod
+    type: forward
+    args:
+      concurrent: 2
+      upstreams:
+        - addr: "tls://120.53.53.53"
+          enable_pipeline: true
+        - addr: "tls://1.12.12.12"
+          enable_pipeline: true
+        - addr: "https://120.53.53.53/dns-query"
+          enable_http3: true
+        - addr: "https://sm2.doh.pub/dns-query"
+          bootstrap: "223.5.5.5"
+
+  # Google DNS (DoH + DoQ + DoT)
+  - tag: google
+    type: forward
+    args:
+      concurrent: 2
+      upstreams:
+        - addr: "tls://8.8.4.4"
+          enable_pipeline: true
+        - addr: "tls://8.8.8.8"
+          enable_pipeline: true
+        - addr: "https://8.8.8.8/dns-query"
+          enable_http3: true
+
+  # Cloudflare DNS
+  - tag: cloudflare
+    type: forward
+    args:
+      concurrent: 2
+      upstreams:
+        - addr: "tls://1.1.1.1"
+          enable_pipeline: true
+        - addr: "tls://1.0.0.1"
+          enable_pipeline: true
+        - addr: "https://1.1.1.1/dns-query"
+          enable_http3: true
+        - addr: "https://1.0.0.1/dns-query"
+          enable_http3: true
+
+  ##################################################
+  # 本地 Dnsmasq
+  - tag: dns_lan
+    type: forward
+    args:
+      concurrent: 1
+      upstreams:
+        - addr: "udp://127.0.0.1:5555"
+
+  - tag: dns_near
+    type: "fallback"
+    args:
+      primary: near
+      secondary: ali
+      threshold: 250
+      always_standby: true # 副可执行插件始终待命
+
+  - tag: dns_cn
+    type: "fallback"
+    args:
+      primary: ali
+      secondary: dnspod
+      threshold: 500
+      always_standby: true # 副可执行插件始终待命
+  
+  - tag: dns_global
+    type: "fallback"
+    args:
+      primary: cloudflare
+      secondary: google
+      threshold: 500
+      always_standby: true # 副可执行插件始终待命
+
+  # local dns
+  - tag: local
+    type: forward
+    args:
+      concurrent: 1
+      upstreams:
+        - addr: "udp://127.0.0.1:5555"
+
+  ################# 可执行插件 ################
+  - tag: cache_wan
+    type: "cache"
+    args:
+      size: 88888
+      # (实验性) lazy cache 设定。lazy_cache_ttl > 0 会启用 lazy cache。
+      # 所有应答都会在缓存中存留 lazy_cache_ttl 秒，但自身的 TTL 仍然有效。如果命中过期的应答，
+      # 则缓存会立即返回 TTL 为 5 的应答，然后自动在后台发送请求更新数据。
+      # 相比强行增加应答自身的 TTL 的方法，lazy cache 能提高命中率，同时还能保持一定的数据新鲜度。
+      lazy_cache_ttl: 10800        # lazy cache 生存时间。单位: 秒。默认: 0 (禁用 lazy cache)。
+                              # 建议值 86400（1天）~ 259200（3天）
+      # dump_file: ./cache.dump
+      # # (实验性) 自动保存间隔。单位秒。默认 600。
+      # # 如果距离上次 dump 有 1024 次更新，则自动保存。
+      # dump_interval: 86400
+
+  # 缓存 lan
+  - tag: cache_lan
+    type: cache
+    args:
+      size: 8192
+      lazy_cache_ttl: 10800
+
+  # no ecs
+  - tag: no_ecs
+    type: "ecs_handler"
+    args:
+      forward: false # 是否转发来自下游的 ecs
+      preset: "" # 发送预设 ecs
+      send: false # 是否发送 ecs
+      mask4: 24
+      mask6: 48 
+  
+  # 附加 ecs cn 信息
+  - tag: ecs_cn
+    type: "ecs_handler"
+    args:
+      forward: true # 是否转发来自下游的 ecs
+      preset: 223.76.221.0 # 发送预设 ecs
+      send: true # 是否发送 ecs
+      mask4: 24 # ipv4 掩码。默认 24
+      mask6: 48 # ipv6 掩码。默认 48
+
+
+
+  # https://dns.66a.net/  果冻
+  - tag: other_cn
+    type: forward
+    args:
+      concurrent: 1
+      upstreams:
+        # DoQ
+        - addr: "quic://pure.666.66a.net:853"
+          bootstrap: "223.5.5.5"
+          bootstrap_version: 4
+        # DoH
+        - addr: "https://i959772813.666.66a.net/dns-query/pure"
+          bootstrap: "223.5.5.5"
+          bootstrap_version: 4
+          enable_http3: true
+        # DoH (HTTP/3 显式 h3)
+        - addr: "h3://i412597688.666.66a.net/dns-query/pure"
+          bootstrap: "223.5.5.5"
+          bootstrap_version: 4
+
+  # AdGuard DNS
+  - tag: adguard
+    type: forward
+    args:
+      concurrent: 2
+      upstreams:
+        - addr: "https://dns.adguard.com/dns-query"
+          dial_addr: "94.140.15.15"
+          enable_http3: true
+        - addr: "tls://94.140.14.14"
+          enable_pipeline: true
+        - addr: "tls://94.140.14.140"
+          dial_addr: "94.140.14.140"
+          enable_pipeline: true
+
+  - tag: other_global
+    type: forward
+    args:
+      concurrent: 2
+      upstreams:
+        # - addr: "https://dns11.quad9.net/dns-query"
+        #   dial_addr: "9.9.9.11"
+        # - addr: "https://dns11.quad9.net/dns-query"
+        #   dial_addr: "2620:fe::11"
+        - addr: "tls://101.101.101.101"
+          enable_pipeline: true
+        - addr: "tls://45.11.45.11"
+          enable_pipeline: true
+        - addr: "tls://9.9.9.9"
+          enable_pipeline: true

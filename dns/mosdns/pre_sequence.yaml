@@ -1,0 +1,95 @@
+plugins:
+##########################################################
+# 前序处理完成后的响应处理
+  - tag: pre_response_handler
+    type: sequence
+    args:
+      - exec: query_summary has_resp_pre
+      # 如果你的网络中有设备频繁加入和离开, 可以适当调低，例如 3600 (1 小时) 或 1800 (30 分钟)，以确保 PTR 记录能较快地反映网络变化。
+      - exec: ttl 1800
+      - exec: accept
+
+##########################################################
+# 拒绝和特殊处理序列
+  - tag: reject_unsupported_qtype
+    type: sequence
+    args:
+      - exec: query_summary reject_unsupported_qtype
+      - exec: reject 5    # 不支持的操作
+
+  - tag: reject_invalid_domain
+    type: sequence
+    args:
+      - exec: query_summary reject_invalid_domain
+      - exec: reject 3    # 拒绝响应
+
+##########################################################
+# 局域网查询处理（带缓存）
+  - tag: query_lan_with_cache
+    type: sequence
+    args:
+      - exec: $cache_lan
+      - matches: has_resp
+        exec: goto pre_response_handler
+      - exec: $dns_lan
+      - matches: has_resp
+        exec: goto pre_response_handler
+
+# 查询 global DNS
+  - tag: query_global_pre
+    type: sequence
+    args:
+      - exec: $no_ecs
+      - exec: $dns_global
+      - matches: has_resp
+        exec: goto pre_response_handler
+
+##########################################################
+# PTR 查询统一处理（修复版）
+  - tag: handle_ptr_query
+    type: sequence
+    args:
+      # 阻止特定 PTR 请求
+      - matches: qname $local_ptr
+        exec: reject 5
+      # 私网 PTR 使用局域网解析
+      - matches: ptr_ip $geoip_private
+        exec: goto query_lan_with_cache
+      # 其他 PTR 使用全局 DNS
+      - exec: goto query_global_pre
+
+##########################################################
+# 前序处理序列（修复版）
+  - tag: pre_sequence
+    type: sequence
+    args:
+      # 1. 优先检查无效域名（快速拒绝）
+      - matches: "qname keyword::"
+        exec: goto reject_invalid_domain
+
+      # 2. 不支持的查询类型（快速拒绝）
+      # - matches: qtype 65    # DNS server status
+      #   exec: goto reject_unsupported_qtype
+
+      # 3. hosts 检查（所有查询类型）
+      - exec: $hosts
+      - matches: has_resp
+        exec: goto pre_response_handler
+
+      # 4. A/AAAA 记录返回主序列处理（最常见的查询）
+      - matches: qtype 1 28   # A, AAAA记录
+        exec: return
+
+      # 5. PTR 查询处理
+      - matches: qtype 12
+        exec: goto handle_ptr_query
+
+      # 特殊类型查询处理：
+      # TXT (16) 文本记录, SRV (33) 服务定位记录, DS (43) 委托签名记录,
+      # NSEC (47) 下一安全记录, DNSKEY (48) DNS密钥记录, NSEC3 (50) 下一安全记录3,
+      # TLSA (52) TLS认证记录, ANY (255) 任意记录, CAA (257) 证书授权记录,
+      # AVC (258) 应用验证证书, DOA (259) DNS对象锚点, AMTRELAY (260) AMT中继记录
+      - matches: qtype 16 33 43 47 48 50 52 255 257 258 259 260
+        exec: goto query_global_pre
+
+      # 注意：如果执行到这里，说明是未知的查询类型，会自然返回主序列处理

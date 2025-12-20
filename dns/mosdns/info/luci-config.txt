@@ -1,0 +1,51 @@
+GeoSite
+% 以下使用国外dns
+category-games-!cn
+category-scholar-!cn
+category-social-media-!cn
+alibaba@!cn
+bytedance@!cn
+bilibili@!cn
+jd@!cn
+icloud@!cn
+
+% 以下使用运营商dns
+category-entertainment-cn
+category-game-accelerator-cn
+category-games-cn
+category-media-cn
+category-mooc-cn
+category-netdisk-cn
+category-scholar-cn
+category-social-media-cn
+category-speedtest@cn
+alibaba
+bytedance
+jd
+icloud
+
+% 以下使用公共dns
+apple-cn
+google-cn
+tld-cn
+cn
+
+category-ads-all
+
+
+gfw
+geolocation-!cn
+geolocation-cn@!cn
+
+        - "/var/mosdns/geosite_gfw.txt"
+        - "/var/mosdns/geosite_geolocation-!cn.txt"
+        - "/var/mosdns/geosite_geolocation-cn@!cn.txt"
+
+
+
+
+GeoIP
+    cn
+    private
+
+
