@@ -1,0 +1,113 @@
+plugins:
+###############################################
+  # 响应处理
+###############################################
+  - tag: response_cn
+    type: sequence
+    args:
+      - exec: query_summary response_cn
+      # - exec: ttl 666 # 3600 秒（1 小时）左右即可
+      - exec: accept
+  - tag: response_global
+    type: sequence
+    args:
+      - exec: query_summary response_global
+      # - exec: ttl 888
+      - exec: accept
+  - tag: response_fallback
+    type: sequence
+    args:
+      - exec: query_summary response_fallback
+      # - exec: ttl 999
+      - exec: accept
+###############################################
+  # DNS 查询序列
+###############################################
+  # 运营商 DNS 查询（丢弃私有 IP 响应）
+  - tag: query_isp
+    type: sequence
+    args:
+      - exec: query_summary dns_isp
+      - exec: $ecs_cn
+      - exec: $dns_near
+      - matches: resp_ip $geoip_private
+        exec: drop_resp
+      - matches: has_resp
+        exec: goto response_cn
+
+  # 中国 DNS 查询（只接受中国 IP）
+  - tag: query_cn
+    type: sequence
+    args:
+      - exec: query_summary dns_cn
+      - exec: $ecs_cn
+      - exec: $dns_cn
+      - matches: resp_ip $geoip_cn
+        exec: goto response_cn
+
+  # Cloudflare DNS 查询
+  - tag: query_cloudflare
+    type: sequence
+    args:
+      - exec: query_summary dns_cloudflare
+      - exec: $no_ecs
+      - exec: $cloudflare
+      - matches: has_resp
+        exec: goto response_global
+
+  # 全局 DNS 查询（拒绝中国 IP）
+  - tag: query_global_no_cn
+    type: sequence
+    args:
+      - exec: query_summary dns_global
+      - exec: $no_ecs
+      - exec: $dns_global
+      - matches: "!resp_ip $geoip_cn"
+        exec: goto response_global  # 使用 goto 直接跳转并终止
+
+  # 兜底查询（全局 DNS，接受所有响应）
+  - tag: query_fallback
+    type: sequence
+    args:
+      - exec: query_summary dns_fallback
+      - exec: $no_ecs
+      - exec: $dns_global
+      - matches: has_resp
+        exec: goto response_fallback  # 使用 goto 直接跳转并终止
+
+###############################################
+  # 主处理序列
+###############################################
+  - tag: main_sequence
+    type: sequence
+    args:
+      # 1. 广告/黑名单（优先处理，快速拒绝）
+      - matches: qname $blocklist
+        exec: reject 5
+
+      # 2. 运营商专用域名
+      - matches: qname $isplist
+        exec: goto query_isp
+
+      # 3. 白名单域名（优先使用中国 DNS）
+      - matches: qname $whitelist
+        exec: goto query_cn
+
+      # 4. DDNS 域名（使用 Cloudflare）
+      - matches: qname $ddnslist
+        exec: goto query_cloudflare
+
+      # 5. 灰名单域名（使用全局 DNS）
+      - matches: qname $greylist
+        exec: goto query_global_no_cn
+
+      # 6. 全局站点（使用全局 DNS）
+      - matches: qname $geosite_global
+        exec: goto query_global_no_cn
+
+      # 7. 中国站点（使用中国 DNS）
+      - matches: qname $geosite_cn
+        exec: goto query_cn
+
+      # 8. 兜底处理：所有未匹配的域名都会到这里
+      - exec: goto query_fallback  # 使用 goto 确保不会继续执行

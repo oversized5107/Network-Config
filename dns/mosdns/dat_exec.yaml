@@ -1,0 +1,88 @@
+plugins:
+################## 数据源 ################
+  - tag: geoip_private # 私网 ip
+    type: ip_set
+    args:
+      files:
+        - "/var/mosdns/geoip_private.txt"
+
+  - tag: geoip_cn # cn ip
+    type: ip_set
+    args:
+      files:
+        - "/var/mosdns/geoip_cn.txt"
+
+###################################################################################
+  - tag: local_ptr
+    type: domain_set
+    args:
+      files:
+        - "/etc/mosdns/rule/local-ptr.txt"
+
+  - tag: hosts  # hosts 域名
+    type: hosts
+    args:
+      files:
+        - "/etc/mosdns/rule/hosts.txt"
+
+  - tag: redirect
+    type: redirect
+    args:
+      files:
+        - "/etc/mosdns/rule/redirect.txt"
+
+
+  - tag: isplist
+    type: domain_set
+    args:
+      files:
+        - "/etc/mosdns/rule/isplist.txt"
+
+  - tag: whitelist
+    type: domain_set
+    args:
+      files:
+        - "/etc/mosdns/rule/whitelist.txt"      
+
+  - tag: ddnslist
+    type: domain_set
+    args:
+      files:
+        - "/etc/mosdns/rule/ddnslist.txt"
+
+  - tag: greylist
+    type: domain_set
+    args:
+      files:
+        - "/etc/mosdns/rule/greylist.txt"
+
+  - tag: blocklist
+    type: domain_set
+    args:
+      files:
+        - "/etc/mosdns/rule/blocklist.txt"
+        # - "/var/mosdns/geosite_category-ads-all.txt"
+
+  - tag: geosite_global # gfw 域名
+    type: domain_set
+    args:
+      files:
+        - "/var/mosdns/geosite_geolocation-!cn.txt"
+        - "/var/mosdns/geosite_tld-!cn.txt"
+
+  - tag: geosite_cn # cn 域名
+    type: domain_set
+    args:
+      files:
+        - "/var/mosdns/geosite_cn.txt"
+
+  # streaming.txt 用于自定义流媒体 DNS：匹配后使用 streaming DNS（如果启用）
+  - tag: streaming
+    type: domain_set
+    args:
+      files:
+        - "/etc/mosdns/rule/streaming.txt"
+
+        
+
+

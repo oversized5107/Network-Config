@@ -1,0 +1,4 @@
+# 加入的域名始终使用 “远程 DNS” 进行解析（每个域名一行，支持域名匹配规则）
+# browserleaks.com
+# ipleak.net
+# dnscheck.tools

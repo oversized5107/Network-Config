@@ -1,0 +1,31 @@
+log:
+  level: error
+  file: "/var/log/mosdns.log"
+
+# api:
+#   http: "0.0.0.0:8338" # api 监听地址
+
+include:
+  - "/etc/mosdns/dat_exec.yaml"
+  - "/etc/mosdns/dns.yaml"
+  - "/etc/mosdns/pre_sequence.yaml"
+  - "/etc/mosdns/main_sequence.yaml"
+
+plugins:
+  - tag: sequence
+    type: sequence
+    args:
+      - exec: $pre_sequence # 前序列处理
+      - matches: has_resp   # 如果前序已处理完成
+        exec: accept
+      - exec: $main_sequence # 主序列处理
+
+  # 在同一端口启动 udp 和 tcp 服务器。
+  - type: udp_server
+    args:
+      entry: sequence
+      listen: :5333
+  - type: tcp_server
+    args:
+      entry: sequence
+      listen: :5333

@@ -1,0 +1,2 @@
+# 重定向请求的域名。请求域名 A，但返回域名 B 的记录，如：baidu.com qq.com（每个规则一行）
+# baidu.com qq.com
